@@ -2,49 +2,67 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { Alert, Button, FormField, Loading } from "@/components/ui";
 
-// Role -> items shown on dashboard (UI convenience only; server enforces access).
-const LINKS = { "My profile": "/profile" };
-
-const MENU = {
-  student: ["My profile", "Notices & rules", "Study room status", "Laundry", "Leave", "Attendance", "Complaints", "Mess", "Fees"],
-  warden: ["Leave requests", "Attendance", "Deviation records"],
-  chief_warden: ["Wardens", "Escalated cases"],
-  director: ["Users & roles", "Hostel information", "Reports"],
-  maintenance: ["Assigned complaints"],
-  mess: ["Mess allocation", "Coupons"],
-  laundry: ["Laundry days", "Handover & collection"],
-};
-
-export default function Dashboard() {
+export default function Profile() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [p, setP] = useState(null);
+  const [phone, setPhone] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [msg, setMsg] = useState({ type: "", text: "" });
+  const [fieldErr, setFieldErr] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api("/api/auth/me/").then(setUser).catch(() => router.replace("/login"));
+    api("/api/auth/profile/")
+      .then((d) => { setP(d); setPhone(d.phone); })
+      .catch((e) => {
+        if (e.status === 401) router.replace("/login");
+        else setLoadError(e.message || "Could not load your profile. Please try again.");
+      });
   }, [router]);
 
-  async function signOut() {
-    await api("/api/auth/logout/", { method: "POST" }).catch(() => {});
-    router.replace("/login");
+  async function save(e) {
+    e.preventDefault();
+    setMsg({ type: "", text: "" });
+    setFieldErr("");
+    setSaving(true);
+    try {
+      const d = await api("/api/auth/profile/", { method: "PATCH", body: { phone } });
+      setP(d);
+      setMsg({ type: "success", text: "Phone number updated." });
+    } catch (err) {
+      setFieldErr(err.fields?.phone || "");
+      setMsg({ type: "error", text: err.message || "Could not save. Please try again." });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (!user) return <main className="p-8">Loading...</main>;
-  const items = MENU[user.role] || [];
   return (
-    <main className="p-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
-        <button onClick={signOut} className="border rounded px-3 py-1">Sign out</button>
-      </div>
-      <p className="mt-1 text-sm">Role: {user.role}</p>
-      <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-        {items.map((i) => (
-          <li key={i} className="bg-white rounded shadow p-4">
-            {LINKS[i] ? <a href={LINKS[i]} className="underline">{i}</a> : i}
-          </li>
-        ))}
-      </ul>
+    <main className="p-8 max-w-lg">
+      <a href="/dashboard" className="underline text-sm">← Dashboard</a>
+      <h1 className="text-2xl font-bold mt-2">My profile</h1>
+      {loadError && <div className="mt-4"><Alert type="error">{loadError}</Alert></div>}
+      {!p && !loadError && <Loading text="Loading your profile..." />}
+      {p && (
+        <>
+          <dl className="mt-4 hs-card space-y-2">
+            {[["Name", p.name], ["Username", p.username], ["USN", p.usn], ["Room", p.room_number]].map(([k, v]) => (
+              <div key={k} className="flex justify-between">
+                <dt className="font-medium">{k}</dt>
+                <dd style={v ? undefined : { color: "var(--hs-muted)" }}>{v || "Not set"}</dd>
+              </div>
+            ))}
+          </dl>
+          <form onSubmit={save} className="mt-6 hs-card space-y-3" noValidate>
+            <FormField id="phone" label="Phone number" value={phone} error={fieldErr}
+              inputMode="tel" onChange={(e) => setPhone(e.target.value)} />
+            <Alert type={msg.type}>{msg.text}</Alert>
+            <Button type="submit" loading={saving} loadingText="Saving...">Save phone</Button>
+          </form>
+        </>
+      )}
     </main>
   );
 }

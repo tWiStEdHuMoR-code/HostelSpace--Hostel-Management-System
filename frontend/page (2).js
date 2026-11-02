@@ -1,46 +1,47 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { Alert, Button, FormField } from "@/components/ui";
 
-// Role -> items shown on dashboard (UI convenience only; server enforces access).
-const MENU = {
-  student: ["My profile", "Notices & rules", "Study room status", "Laundry", "Leave", "Attendance", "Complaints", "Mess", "Fees"],
-  warden: ["Leave requests", "Attendance", "Deviation records"],
-  chief_warden: ["Wardens", "Escalated cases"],
-  director: ["Users & roles", "Hostel information", "Reports"],
-  maintenance: ["Assigned complaints"],
-  mess: ["Mess allocation", "Coupons"],
-  laundry: ["Laundry days", "Handover & collection"],
-};
-
-export default function Dashboard() {
+export default function Login() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [error, setError] = useState("");
+  const [fields, setFields] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    api("/api/auth/me/").then(setUser).catch(() => router.replace("/login"));
-  }, [router]);
-
-  async function signOut() {
-    await api("/api/auth/logout/", { method: "POST" }).catch(() => {});
-    router.replace("/login");
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    setFields({});
+    setLoading(true);
+    try {
+      await api("/api/auth/login/", { method: "POST", body: form });
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(err.message || "Could not reach the server. Check your connection and try again.");
+      setFields(err.fields || {});
+    } finally {
+      setLoading(false);
+    }
   }
 
-  if (!user) return <main className="p-8">Loading...</main>;
-  const items = MENU[user.role] || [];
   return (
-    <main className="p-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
-        <button onClick={signOut} className="border rounded px-3 py-1">Sign out</button>
-      </div>
-      <p className="mt-1 text-sm">Role: {user.role}</p>
-      <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-        {items.map((i) => (
-          <li key={i} className="bg-white rounded shadow p-4">{i}</li>
-        ))}
-      </ul>
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <form onSubmit={submit} className="hs-card p-8 w-full max-w-sm space-y-4" noValidate>
+        <h1 className="text-2xl font-bold">HostelSpace Sign in</h1>
+        <Alert type="error">{error}</Alert>
+        <FormField id="username" label="Username" value={form.username} error={fields.username}
+          autoComplete="username"
+          onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <FormField id="password" label="Password" type="password" value={form.password}
+          error={fields.password} autoComplete="current-password"
+          onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <Button type="submit" loading={loading} loadingText="Signing in..." style={{ width: "100%" }}>
+          Sign in
+        </Button>
+      </form>
     </main>
   );
 }
