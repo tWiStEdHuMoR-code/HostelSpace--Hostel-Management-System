@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --hs-primary: #1d4ed8;
+  --hs-bg: #f8fafc;
+  --hs-text: #0f172a;
+  --hs-error: #b91c1c;
+}
+
+body {
+  background: var(--hs-bg);
+  color: var(--hs-text);
+}
